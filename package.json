@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "cp node_modules/fonteditor-core/woff2/woff2.wasm public/woff2.wasm",
+    "postinstall": "node -e \"const f=require('fs');f.mkdirSync('public',{recursive:true});f.copyFileSync('node_modules/fonteditor-core/woff2/woff2.wasm','public/woff2.wasm')\"",
     "test": "vitest run"
   },
   "dependencies": {
