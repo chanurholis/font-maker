@@ -6,21 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "cp node_modules/fonteditor-core/woff2/woff2.wasm public/woff2.wasm",
+    "test": "vitest run"
   },
   "dependencies": {
+    "fonteditor-core": "^2.6.3",
+    "idb-keyval": "^6.3.0",
     "next": "16.3.7",
+    "opentype.js": "^2.0.0",
+    "perfect-freehand": "^1.2.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.19.0",
+    "@types/opentype.js": "^1.3.10",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   }
 }

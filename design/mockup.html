@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tinta Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a drafting table for type. Glyph index | drawing board | inspector, live preview strip underneath. */
+:root {
+  --paper: #EDF0F3;
+  --sheet: #FFFFFF;
+  --box: #F5F8FB;
+  --ink: #141821;
+  --graphite: #5E6878;
+  --rule: #D5DBE3;
+  --hover: #E4E9EF;
+  --proof: #D12A6B;
+  --proof-soft: rgba(209, 42, 107, .11);
+  --on-proof: #FFFFFF;
+  --guide: #2F7FA8;
+  --warn: #9A5B08;
+  --warn-soft: rgba(196, 124, 20, .12);
+  --display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+  --ui: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 6px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101318; --sheet: #181C23; --box: #1C212A; --ink: #E8ECF2; --graphite: #8D97A8;
+    --rule: #2A303B; --hover: #222833; --proof: #FF5C98; --proof-soft: rgba(255, 92, 152, .14);
+    --on-proof: #1A0710; --guide: #5DB4DE; --warn: #E3A34A; --warn-soft: rgba(227, 163, 74, .12);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101318; --sheet: #181C23; --box: #1C212A; --ink: #E8ECF2; --graphite: #8D97A8;
+  --rule: #2A303B; --hover: #222833; --proof: #FF5C98; --proof-soft: rgba(255, 92, 152, .14);
+  --on-proof: #1A0710; --guide: #5DB4DE; --warn: #E3A34A; --warn-soft: rgba(227, 163, 74, .12);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.45 var(--ui);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--proof); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- Top bar ---------- */
+.top {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  background: var(--sheet); border-bottom: 1px solid var(--rule);
+}
+.brand { font: 700 23px/1 var(--display); letter-spacing: -.03em; display: flex; align-items: baseline; }
+.brand b { color: var(--proof); }
+.doc { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.doc input {
+  width: 11ch; font-weight: 600; font-size: 15px; padding: 4px 6px;
+  border: 1px solid transparent; border-radius: var(--r); background: transparent;
+}
+.doc input:hover { border-color: var(--rule); }
+.doc select {
+  font-family: var(--mono); font-size: 11.5px; color: var(--graphite);
+  border: 1px solid var(--rule); border-radius: 99px; background: var(--sheet); padding: 2px 8px;
+}
+.saved { color: var(--graphite); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.saved::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--guide); }
+.actions { margin-left: auto; display: flex; gap: 8px; }
+.btn {
+  height: 34px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--sheet);
+  font-weight: 600; font-size: 13px;
+}
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--proof); border-color: var(--proof); color: var(--on-proof); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.icon { width: 34px; padding: 0; justify-content: center; color: var(--graphite); }
+
+/* ---------- Shell ---------- */
+.shell { display: grid; grid-template-columns: 272px minmax(0, 1fr) 292px; min-height: 0; }
+.pane { background: var(--sheet); overflow: auto; min-height: 0; }
+.glyphs { border-right: 1px solid var(--rule); }
+.inspector { border-left: 1px solid var(--rule); }
+
+.pane-head { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 16px 8px; }
+.pane-head h2 { margin: 0; font: 700 16px/1.2 var(--display); letter-spacing: -.01em; }
+.pane-head span { font-size: 11.5px; color: var(--graphite); }
+.progress { height: 3px; margin: 0 16px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px 16px; }
+.chip {
+  font-size: 12px; padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--rule); background: transparent; color: var(--graphite);
+}
+.chip:hover { color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 6px; padding: 0 16px 16px; }
+.tile {
+  position: relative; aspect-ratio: 1 / 1.15; max-width: 100%; padding: 0;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--sheet);
+}
+.tile:hover { border-color: var(--graphite); }
+.tile canvas { width: 100%; height: 100%; display: block; }
+.tile span { position: absolute; left: 5px; top: 3px; font: 10px var(--mono); color: var(--graphite); }
+.tile.done { background: var(--box); }
+.tile[aria-current="true"] { border-color: var(--proof); box-shadow: inset 0 0 0 1px var(--proof); }
+.tile[aria-current="true"] span { color: var(--proof); }
+
+/* ---------- Stage ---------- */
+.stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; }
+.tgroup { display: flex; gap: 2px; padding: 3px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; }
+.tool {
+  width: 32px; height: 32px; display: grid; place-items: center; position: relative;
+  border: 0; border-radius: 5px; background: transparent; color: var(--graphite);
+}
+.tool:hover { background: var(--hover); color: var(--ink); }
+.tool[aria-pressed="true"] { background: var(--proof-soft); color: var(--proof); }
+.tool[data-soon]::after {
+  content: ""; position: absolute; right: 5px; top: 5px; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--guide);
+}
+.toolbar .spacer { flex: 1; }
+.zoom { font-size: 11.5px; color: var(--graphite); }
+
+.board-wrap {
+  position: relative; margin: 0 16px; min-height: 0;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--r); overflow: hidden;
+}
+#board { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+#board.erase { cursor: cell; }
+.badge { position: absolute; top: 12px; right: 16px; text-align: right; pointer-events: none; }
+.badge strong { display: block; font: 700 40px/1 var(--display); letter-spacing: -.02em; }
+.badge span { font-size: 11px; color: var(--graphite); }
+.nav {
+  position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px;
+  background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 3px;
+}
+.nav span { font-size: 11.5px; color: var(--graphite); padding: 0 6px; min-width: 7ch; text-align: center; }
+
+.status { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 16px 10px; font-size: 11.5px; color: var(--graphite); }
+
+/* ---------- Inspector ---------- */
+.sec { padding: 16px; border-bottom: 1px solid var(--rule); display: grid; gap: 12px; }
+.sec h3 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--graphite); }
+.glyph-hero { display: flex; gap: 14px; align-items: center; }
+.glyph-hero .big {
+  width: 64px; height: 72px; display: grid; place-items: center; flex: none;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--box);
+  font: 500 44px/1 var(--display);
+}
+.glyph-hero b { display: block; font-weight: 600; }
+.glyph-hero span { font-size: 12px; color: var(--graphite); }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label, .field .lbl { font-size: 12px; color: var(--graphite); }
+.field input[type="number"], .field output {
+  height: 32px; width: 100%; padding: 0 8px; display: flex; align-items: center;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--paper);
+  font: 13px var(--mono); font-variant-numeric: tabular-nums;
+}
+.field output { background: transparent; color: var(--graphite); }
+.slider { display: grid; gap: 4px; }
+.slider .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--graphite); }
+.slider .row span { font-family: var(--mono); color: var(--ink); }
+input[type="range"] { width: 100%; accent-color: var(--proof); margin: 0; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { accent-color: var(--proof); width: 16px; height: 16px; margin: 0; }
+dl.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 13px; }
+dl.kv dt { color: var(--graphite); }
+dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 12.5px; color: var(--graphite); align-items: center; }
+kbd {
+  font: 11px var(--mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; justify-self: start;
+}
+.link { border: 0; background: none; padding: 0; color: var(--graphite); font-size: 12.5px; text-decoration: underline; text-underline-offset: 3px; justify-self: start; }
+.link:hover { color: var(--ink); }
+
+/* ---------- Preview strip ---------- */
+.preview {
+  display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 224px;
+  background: var(--sheet); border-top: 1px solid var(--rule);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pv-controls { padding: 14px 16px; border-right: 1px solid var(--rule); display: grid; gap: 10px; align-content: start; overflow: auto; }
+.pv-controls h2 { margin: 0; font: 700 14px var(--display); display: flex; justify-content: space-between; align-items: baseline; }
+.pv-controls h2 span { font: 11.5px var(--mono); color: var(--graphite); }
+#previewText {
+  height: 36px; width: 100%; padding: 0 10px; font-size: 15px;
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--paper);
+}
+.samples { display: flex; flex-wrap: wrap; gap: 4px; }
+.sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.pv-out { position: relative; overflow: auto; min-width: 0; }
+#previewCanvas { width: 100%; display: block; }
+.missing {
+  position: absolute; left: 16px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  font-size: 12px; color: var(--graphite); background: var(--sheet); padding: 4px 8px 4px 0;
+}
+.missing button {
+  font: 12px var(--mono); padding: 1px 7px; border-radius: 4px;
+  border: 1px dashed var(--graphite); background: transparent;
+}
+.missing button:hover { border-color: var(--proof); color: var(--proof); }
+
+/* ---------- Export dialog ---------- */
+dialog {
+  width: min(660px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--sheet); color: var(--ink);
+}
+dialog::backdrop { background: rgba(10, 12, 16, .5); }
+.dlg { display: grid; gap: 18px; padding: 20px; }
+.dlg header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.dlg h2 { margin: 0; font: 700 22px/1.15 var(--display); letter-spacing: -.02em; text-wrap: balance; }
+.dlg header p { margin: 4px 0 0; color: var(--graphite); font-size: 13px; }
+.notice {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r);
+  background: var(--warn-soft); color: var(--warn); font-size: 13px;
+}
+.notice button { margin-left: auto; border: 0; background: none; color: inherit; text-decoration: underline; font-size: 13px; padding: 0; white-space: nowrap; }
+.dlg h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--graphite); }
+.formats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fmt {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer;
+  border: 1px solid var(--rule); border-radius: var(--r);
+}
+.fmt:has(input:checked) { border-color: var(--proof); background: var(--proof-soft); }
+.fmt input { accent-color: var(--proof); margin: 2px 0 0; }
+.fmt b { font: 500 13px var(--mono); display: block; }
+.fmt span { font-size: 12.5px; color: var(--graphite); }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.tabs button {
+  border: 0; background: none; padding: 8px 12px; font-weight: 600; font-size: 13px; color: var(--graphite);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--proof); }
+.panel { display: grid; gap: 10px; padding-top: 12px; font-size: 13.5px; }
+.panel p { margin: 0; max-width: 62ch; }
+.panel ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.code { position: relative; }
+.code pre {
+  margin: 0; padding: 12px 14px; overflow-x: auto; border-radius: var(--r);
+  background: var(--paper); border: 1px solid var(--rule); font: 12px/1.6 var(--mono);
+}
+.code .btn { position: absolute; top: 6px; right: 6px; height: 28px; font-size: 12px; padding: 0 10px; }
+.dlg footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--rule); padding-block: 14px 0; }
+.dlg footer .files { font-size: 12px; color: var(--graphite); min-width: 0; flex: 1; overflow-wrap: anywhere; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: var(--sheet); padding: 10px 14px; border-radius: 8px; font-size: 13px;
+  max-width: calc(100vw - 32px); z-index: 10;
+}
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 1060px) {
+  html, body { height: auto; }
+  body { display: block; }
+  .shell { grid-template-columns: 1fr; }
+  .stage { order: -1; grid-template-rows: auto 440px auto; }
+  .glyphs { border-right: 0; border-top: 1px solid var(--rule); max-height: 360px; }
+  .inspector { border-left: 0; border-top: 1px solid var(--rule); }
+  .preview { grid-template-columns: 1fr; height: auto; }
+  .pv-controls { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .pv-out { height: 220px; }
+}
+@media (max-width: 560px) {
+  .saved, .zoom { display: none; }
+  .stage { grid-template-rows: auto 360px auto; }
+  .formats { grid-template-columns: 1fr; }
+  .actions .btn.primary .lbl { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">Tinta<b>.</b></div>
+  <div class="doc">
+    <input id="familyName" value="Tinta Hand" aria-label="Font family name" spellcheck="false">
+    <select id="styleSel" aria-label="Font style">
+      <option>Regular</option><option>Bold</option><option>Italic</option>
+    </select>
+  </div>
+  <span class="saved" id="savedLabel">Saved in this browser</span>
+  <div class="actions">
+    <button class="btn icon" id="themeBtn" type="button" aria-label="Switch light or dark theme" title="Switch theme" data-icon="moon"></button>
+    <button class="btn primary" id="exportBtn" type="button" data-icon="download"><span class="lbl">Export font</span></button>
+  </div>
+</header>
+
+<main class="shell">
+  <aside class="pane glyphs" aria-label="Glyph set">
+    <div class="pane-head"><h2>Glyphs</h2><span class="mono" id="progressLabel"></span></div>
+    <div class="progress"><span id="progressBar"></span></div>
+    <div class="filters" id="filters">
+      <button class="chip" type="button" data-filter="all" aria-pressed="true">All</button>
+      <button class="chip" type="button" data-filter="upper" aria-pressed="false">A–Z</button>
+      <button class="chip" type="button" data-filter="lower" aria-pressed="false">a–z</button>
+      <button class="chip" type="button" data-filter="digit" aria-pressed="false">0–9</button>
+      <button class="chip" type="button" data-filter="punct" aria-pressed="false">Punctuation</button>
+    </div>
+    <div class="grid" id="glyphGrid"></div>
+  </aside>
+
+  <section class="stage" aria-label="Drawing board">
+    <div class="toolbar">
+      <div class="tgroup" role="group" aria-label="Tools">
+        <button class="tool" type="button" data-tool="brush" aria-pressed="true" title="Brush (B)" aria-label="Brush" data-icon="brush"></button>
+        <button class="tool" type="button" data-tool="eraser" aria-pressed="false" title="Eraser (E)" aria-label="Eraser" data-icon="eraser"></button>
+        <button class="tool" type="button" data-soon="Pen tool (bezier points)" title="Pen tool (P), phase 2" aria-label="Pen tool" data-icon="pen"></button>
+        <button class="tool" type="button" data-soon="SVG import" title="Import SVG, phase 2" aria-label="Import SVG" data-icon="upload"></button>
+      </div>
+      <div class="tgroup" role="group" aria-label="History">
+        <button class="tool" type="button" id="undoBtn" title="Undo (⌘Z)" aria-label="Undo" data-icon="undo"></button>
+        <button class="tool" type="button" id="redoBtn" title="Redo (⇧⌘Z)" aria-label="Redo" data-icon="redo"></button>
+        <button class="tool" type="button" id="clearBtn" title="Clear glyph" aria-label="Clear glyph" data-icon="trash"></button>
+      </div>
+      <div class="tgroup" role="group" aria-label="View">
+        <button class="tool" type="button" data-toggle="grid" aria-pressed="true" title="Graph grid (G)" aria-label="Graph grid" data-icon="grid"></button>
+        <button class="tool" type="button" data-toggle="guides" aria-pressed="true" title="Metric guides" aria-label="Metric guides" data-icon="guides"></button>
+        <button class="tool" type="button" data-toggle="trace" aria-pressed="false" title="Trace reference letter (T)" aria-label="Trace reference letter" data-icon="eye"></button>
+      </div>
+      <span class="spacer"></span>
+      <span class="zoom mono">1000 UPM · fit</span>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="board" aria-label="Draw the selected glyph here"></canvas>
+      <div class="badge"><strong id="badgeChar">a</strong><span class="mono" id="badgeCode">U+0061</span></div>
+      <div class="nav">
+        <button class="tool" type="button" id="prevBtn" title="Previous glyph (←)" aria-label="Previous glyph" data-icon="left"></button>
+        <span class="mono" id="navPos"></span>
+        <button class="tool" type="button" id="nextBtn" title="Next glyph (→)" aria-label="Next glyph" data-icon="right"></button>
+      </div>
+    </div>
+
+    <div class="status mono">
+      <span id="stTool">Brush · 74 u</span>
+      <span id="coords">x —  y —</span>
+      <span id="stPointer">Pressure: mouse (constant)</span>
+    </div>
+  </section>
+
+  <aside class="pane inspector" aria-label="Inspector">
+    <div class="sec">
+      <h3>Glyph</h3>
+      <div class="glyph-hero">
+        <div class="big" id="gChar">a</div>
+        <div><b id="gName">Lowercase a</b><span class="mono" id="gCode">U+0061</span></div>
+      </div>
+      <div class="fields">
+        <div class="field"><label for="advInput">Advance width</label><input type="number" id="advInput" min="100" max="1400" step="10"></div>
+        <div class="field"><span class="lbl">Strokes</span><output id="strokeCount">0</output></div>
+        <div class="field"><span class="lbl">Left bearing</span><output id="lsb">—</output></div>
+        <div class="field"><span class="lbl">Right bearing</span><output id="rsb">—</output></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>Brush</h3>
+      <div class="slider">
+        <div class="row"><label for="brushSize">Size</label><span id="brushSizeVal">74 u</span></div>
+        <input type="range" id="brushSize" min="20" max="160" value="74">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="smooth">Smoothing</label><span id="smoothVal">50%</span></div>
+        <input type="range" id="smooth" min="0" max="100" value="50">
+      </div>
+      <label class="check"><input type="checkbox" id="pressure" checked> Use stylus pressure</label>
+    </div>
+
+    <div class="sec">
+      <h3>Font metrics</h3>
+      <dl class="kv">
+        <dt>Units per em</dt><dd>1000</dd>
+        <dt>Ascender</dt><dd>800</dd>
+        <dt>Cap height</dt><dd>700</dd>
+        <dt>x-height</dt><dd>500</dd>
+        <dt>Descender</dt><dd>−200</dd>
+      </dl>
+    </div>
+
+    <div class="sec">
+      <h3>Shortcuts</h3>
+      <div class="keys">
+        <kbd>B</kbd><span>Brush</span>
+        <kbd>E</kbd><span>Eraser</span>
+        <kbd>[ ]</kbd><span>Brush size</span>
+        <kbd>← →</kbd><span>Previous / next glyph</span>
+        <kbd>⌘Z</kbd><span>Undo, add ⇧ to redo</span>
+        <kbd>G</kbd><span>Toggle grid</span>
+        <kbd>T</kbd><span>Toggle trace letter</span>
+      </div>
+      <button class="link" type="button" id="resetBtn">Reset to sample glyphs</button>
+    </div>
+  </aside>
+</main>
+
+<footer class="preview" aria-label="Live preview">
+  <div class="pv-controls">
+    <h2>Live preview <span id="weightName">Regular 400</span></h2>
+    <input id="previewText" value="Hello Tinta" aria-label="Preview text" spellcheck="false">
+    <div class="samples">
+      <button class="chip" type="button" data-sample="Hello Tinta">Hello Tinta</button>
+      <button class="chip" type="button" data-sample="the tide on the hall">Words</button>
+      <button class="chip" type="button" data-sample="The quick brown fox jumps over the lazy dog">Pangram</button>
+    </div>
+    <div class="sliders">
+      <div class="slider"><div class="row"><label for="pvSize">Size</label><span id="pvSizeVal">64 px</span></div><input type="range" id="pvSize" min="20" max="140" value="64"></div>
+      <div class="slider"><div class="row"><label for="pvWeight">Weight</label><span id="pvWeightVal">1.00×</span></div><input type="range" id="pvWeight" min="50" max="180" value="100"></div>
+      <div class="slider"><div class="row"><label for="pvSlant">Slant</label><span id="pvSlantVal">0°</span></div><input type="range" id="pvSlant" min="0" max="16" value="0"></div>
+      <div class="slider"><div class="row"><label for="pvTrack">Tracking</label><span id="pvTrackVal">0 u</span></div><input type="range" id="pvTrack" min="-60" max="200" step="10" value="0"></div>
+    </div>
+  </div>
+  <div class="pv-out" id="pvOut">
+    <canvas id="previewCanvas" aria-label="Preview of your font"></canvas>
+    <div class="missing" id="missing" hidden></div>
+  </div>
+</footer>
+
+<dialog id="exportDlg" aria-labelledby="exportTitle">
+  <form method="dialog" class="dlg">
+    <header>
+      <div>
+        <h2 id="exportTitle">Export Tinta Hand</h2>
+        <p>Your font is built in this browser. Nothing is uploaded.</p>
+      </div>
+      <button class="btn icon" value="cancel" aria-label="Close" data-icon="x"></button>
+    </header>
+
+    <div class="notice" id="emptyNotice">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      <span id="emptyText"></span>
+      <button type="button" id="gotoEmpty">Draw next empty glyph</button>
+    </div>
+
+    <div>
+      <h3>Formats</h3>
+      <div class="formats" id="formats">
+        <label class="fmt"><input type="checkbox" value="otf" checked><div><b>.otf</b><span>Figma, Adobe apps, macOS</span></div></label>
+        <label class="fmt"><input type="checkbox" value="ttf" checked><div><b>.ttf</b><span>Widest support: Windows, Android, video editors</span></div></label>
+        <label class="fmt"><input type="checkbox" value="woff2" checked><div><b>.woff2</b><span>Websites, smallest file</span></div></label>
+        <label class="fmt"><input type="checkbox" value="woff"><div><b>.woff</b><span>Websites, older browsers</span></div></label>
+      </div>
+    </div>
+
+    <div>
+      <h3>Where will you use it?</h3>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="web" aria-selected="true">Website</button>
+        <button type="button" role="tab" data-tab="design" aria-selected="false">Design apps</button>
+        <button type="button" role="tab" data-tab="video" aria-selected="false">Video</button>
+        <button type="button" role="tab" data-tab="apps" aria-selected="false">Mobile apps</button>
+      </div>
+      <div class="panel" data-panel="web">
+        <p>Put the files in <code class="mono">/public/fonts</code> and add this CSS.</p>
+        <div class="code"><pre id="cssSnippet"></pre><button class="btn" type="button" id="copyCss">Copy</button></div>
+      </div>
+      <div class="panel" data-panel="design" hidden>
+        <ol>
+          <li>Double-click the <span class="mono">.otf</span> file and choose Install.</li>
+          <li>Restart Figma (desktop app), Photoshop, Illustrator or Affinity.</li>
+          <li>Pick <b class="fam">Tinta Hand</b> from the font menu.</li>
+        </ol>
+      </div>
+      <div class="panel" data-panel="video" hidden>
+        <ol>
+          <li>Install the <span class="mono">.ttf</span> file on the computer that edits the video.</li>
+          <li>Restart Premiere Pro, After Effects, DaVinci Resolve or Final Cut. The font appears in the text tool.</li>
+          <li>For mobile editors, import the <span class="mono">.ttf</span> wherever the app accepts custom fonts.</li>
+        </ol>
+      </div>
+      <div class="panel" data-panel="apps" hidden>
+        <p>Android: copy the file to <span class="mono">res/font/</span>. iOS: add it to the Xcode target and list it under “Fonts provided by application”.</p>
+        <div class="code"><pre id="appSnippet"></pre></div>
+      </div>
+    </div>
+
+    <footer>
+      <span class="files mono" id="fileList"></span>
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" value="export" id="doExport">Export 3 files</button>
+    </footer>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const root = document.documentElement;
+const TAU = Math.PI * 2, PI = Math.PI;
+
+/* ---------- Icons ---------- */
+const ICONS = {
+  brush: '<path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/>',
+  eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+  pen: '<path d="M15.7 21.3a1 1 0 0 1-1.4 0l-1.6-1.6a1 1 0 0 1 0-1.4l5.6-5.6a1 1 0 0 1 1.4 0l1.6 1.6a1 1 0 0 1 0 1.4z"/><path d="m18 13-1.4-6.9a1 1 0 0 0-.7-.8L3.2 2a1 1 0 0 0-1.2 1.2l3.3 12.7a1 1 0 0 0 .8.7L13 18"/><path d="m2.3 2.3 7.3 7.3"/><circle cx="11" cy="11" r="2"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
+  redo: '<path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  grid: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+  guides: '<path d="M3 6h18" stroke-dasharray="3 3"/><path d="M3 12h18"/><path d="M3 18h18" stroke-dasharray="3 3"/>',
+  eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+};
+document.querySelectorAll('[data-icon]').forEach(el =>
+  el.insertAdjacentHTML('afterbegin', `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[el.dataset.icon]}</svg>`));
+
+/* ---------- Font model ---------- */
+const M = { upm: 1000, asc: 800, cap: 700, xh: 500, desc: -200 };
+const CHARSET = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;!?\'"-()&@#%*/+=[]<>$'];
+const PUNCT = { '.': 'Period', ',': 'Comma', ':': 'Colon', ';': 'Semicolon', '!': 'Exclamation mark', '?': 'Question mark', "'": 'Apostrophe', '"': 'Quotation mark', '-': 'Hyphen', '(': 'Left parenthesis', ')': 'Right parenthesis', '&': 'Ampersand', '@': 'At sign', '#': 'Number sign', '%': 'Percent sign', '*': 'Asterisk', '/': 'Slash', '+': 'Plus sign', '=': 'Equals sign', '[': 'Left bracket', ']': 'Right bracket', '<': 'Less-than sign', '>': 'Greater-than sign', '$': 'Dollar sign' };
+const kind = ch => /[A-Z]/.test(ch) ? 'upper' : /[a-z]/.test(ch) ? 'lower' : /\d/.test(ch) ? 'digit' : 'punct';
+const nameOf = ch => ({ upper: `Uppercase ${ch}`, lower: `Lowercase ${ch}`, digit: `Figure ${ch}` })[kind(ch)] || PUNCT[ch] || 'Symbol';
+const defaultAdv = ch => ({ upper: 620, lower: 500, digit: 540, punct: 280 })[kind(ch)];
+const unicodeOf = ch => 'U+' + ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+
+/* Sample glyphs, drawn as monoline strokes in font units (y-up, baseline 0). */
+function Ln(x1, y1, x2, y2) {
+  const n = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 18));
+  return Array.from({ length: n + 1 }, (_, i) => [x1 + (x2 - x1) * i / n, y1 + (y2 - y1) * i / n]);
+}
+function Arc(cx, cy, rx, ry, a0, a1) {
+  const n = Math.max(8, Math.ceil(Math.abs(a1 - a0) * Math.max(rx, ry) / 18));
+  return Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
+}
+const J = (...parts) => parts.flat();
+const bowl = () => Arc(250, 250, 185, 250, 0, TAU);
+const SEED = {
+  a: [520, [bowl(), Ln(435, 500, 435, 0)]],
+  c: [480, [Arc(260, 250, 200, 250, PI * .27, PI * 1.73)]],
+  d: [520, [bowl(), Ln(435, 750, 435, 0)]],
+  e: [520, [J(Ln(70, 255, 440, 255), Arc(255, 250, 188, 250, 0.03, TAU - 0.55))]],
+  h: [500, [Ln(70, 750, 70, 0), J(Arc(250, 320, 180, 180, PI, 0), Ln(430, 320, 430, 0))]],
+  i: [170, [Ln(85, 500, 85, 0), [[85, 660]]]],
+  l: [170, [Ln(85, 750, 85, 0)]],
+  m: [640, [Ln(70, 500, 70, 0), J(Arc(195, 330, 125, 170, PI, 0), Ln(320, 330, 320, 0)), J(Arc(445, 330, 125, 170, PI, 0), Ln(570, 330, 570, 0))]],
+  n: [500, [Ln(70, 500, 70, 0), J(Arc(250, 320, 180, 180, PI, 0), Ln(430, 320, 430, 0))]],
+  o: [540, [Arc(270, 250, 205, 250, 0, TAU)]],
+  r: [360, [Ln(70, 500, 70, 0), Arc(240, 300, 170, 200, PI, PI * .3)]],
+  s: [470, [J(Arc(235, 375, 160, 125, PI * .15, PI * 1.5), Arc(235, 125, 170, 125, PI * .5, -PI * .85))]],
+  t: [360, [J(Ln(150, 700, 150, 110), Arc(270, 110, 120, 110, PI, PI * 1.55)), Ln(40, 500, 310, 500)]],
+  u: [500, [J(Ln(70, 500, 70, 180), Arc(250, 180, 180, 180, PI, TAU)), Ln(430, 500, 430, 0)]],
+  A: [600, [J(Ln(40, 0, 300, 700), Ln(300, 700, 560, 0)), Ln(135, 250, 465, 250)]],
+  E: [520, [J(Ln(460, 700, 80, 700), Ln(80, 700, 80, 0), Ln(80, 0, 460, 0)), Ln(80, 360, 400, 360)]],
+  H: [600, [Ln(80, 700, 80, 0), Ln(520, 700, 520, 0), Ln(80, 360, 520, 360)]],
+  I: [180, [Ln(90, 700, 90, 0)]],
+  L: [500, [J(Ln(80, 700, 80, 0), Ln(80, 0, 460, 0))]],
+  O: [660, [Arc(330, 350, 270, 350, 0, TAU)]],
+  T: [600, [Ln(40, 700, 560, 700), Ln(300, 700, 300, 0)]],
+  0: [520, [Arc(260, 350, 190, 350, 0, TAU)]],
+  1: [420, [J(Ln(110, 560, 260, 700), Ln(260, 700, 260, 0))]],
+  '.': [200, [[[100, 30]]]],
+  '!': [220, [Ln(110, 700, 110, 220), [[110, 30]]]],
+};
+const hand = (pts, seed) => pts.map(([x, y], i) => [
+  Math.round(x + 5 * Math.sin(i * .25 + seed)),
+  Math.round(y + 5 * Math.cos(i * .21 + seed * 2)),
+  +(0.5 + 0.2 * Math.sin(i * .18 + seed)).toFixed(2),
+]);
+function sampleGlyphs() {
+  const out = {};
+  CHARSET.forEach((ch, ci) => {
+    const d = SEED[ch];
+    out[ch] = { adv: d ? d[0] : defaultAdv(ch), strokes: d ? d[1].map((pts, k) => ({ size: 74, points: hand(pts, ci * 3 + k) })) : [] };
+  });
+  return out;
+}
+
+/* ---------- State ---------- */
+const KEY = 'tinta-mockup-v1';
+const st = { sel: 'a', tool: 'brush', size: 74, smooth: .5, pressure: true, grid: true, guides: true, trace: false,
+  filter: 'all', psize: 64, weight: 1, slant: 0, tracking: 0, text: 'Hello Tinta', family: 'Tinta Hand', style: 'Regular' };
+let glyphs = sampleGlyphs();
+try {
+  const d = JSON.parse(localStorage.getItem(KEY));
+  if (d && d.glyphs) { CHARSET.forEach(ch => { if (d.glyphs[ch]) glyphs[ch] = d.glyphs[ch]; }); st.family = d.family || st.family; }
+} catch {}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ family: st.family, glyphs })); } catch {}
+  $('#savedLabel').textContent = 'Saved in this browser';
+}
+
+/* ---------- Drawing helpers ---------- */
+function fitCanvas(c) {
+  const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  c.width = Math.max(1, Math.round(r.width * d)); c.height = Math.max(1, Math.round(r.height * d));
+  const ctx = c.getContext('2d'); ctx.setTransform(d, 0, 0, d, 0, 0);
+  return { w: r.width, h: r.height, ctx };
+}
+const tokens = () => { const cs = getComputedStyle(root); return n => cs.getPropertyValue('--' + n).trim(); };
+
+// Strokes render as round-capped segments whose width follows pressure. The app will use perfect-freehand outlines instead.
+function paintStrokes(ctx, strokes, X, Y, scale, mul, color) {
+  ctx.strokeStyle = ctx.fillStyle = color; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const s of strokes) {
+    const P = s.points;
+    if (P.length === 1) {
+      ctx.beginPath(); ctx.arc(X(P[0][0], P[0][1]), Y(P[0][1]), s.size * scale * mul * .5, 0, TAU); ctx.fill(); continue;
+    }
+    for (let i = 1; i < P.length; i++) {
+      const a = P[i - 1], b = P[i];
+      ctx.lineWidth = Math.max(1, s.size * scale * mul * (0.45 + 1.1 * (a[2] + b[2]) / 2));
+      ctx.beginPath(); ctx.moveTo(X(a[0], a[1]), Y(a[1])); ctx.lineTo(X(b[0], b[1]), Y(b[1])); ctx.stroke();
+    }
+  }
+}
+
+/* ---------- Board ---------- */
+const board = $('#board');
+let B = {}, view = { s: 1, ox: 0, oy: 0 };
+const GUIDES = [['Ascender', M.asc], ['Cap height', M.cap], ['x-height', M.xh], ['Baseline', 0], ['Descender', M.desc]];
+
+function renderBoard() {
+  const { w, h, ctx } = B; if (!ctx) return;
+  const t = tokens(), g = glyphs[st.sel];
+  ctx.clearRect(0, 0, w, h);
+  const s = Math.min(h / 1250, w / (g.adv + 800));
+  const ox = (w - g.adv * s) / 2, oy = h / 2 + 300 * s;
+  view = { s, ox, oy };
+  const X = x => ox + x * s, Y = y => oy - y * s;
+
+  ctx.fillStyle = t('box');
+  ctx.fillRect(X(0), Y(M.asc), g.adv * s, (M.asc - M.desc) * s);
+
+  if (st.grid) {
+    ctx.strokeStyle = t('rule'); ctx.lineWidth = 1;
+    for (let u = Math.floor(-ox / s / 50) * 50; X(u) <= w; u += 50) {
+      ctx.globalAlpha = u % 100 === 0 ? .9 : .4;
+      const px = Math.round(X(u)) + .5; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+    }
+    for (let u = Math.floor((oy - h) / s / 50) * 50; u <= oy / s; u += 50) {
+      ctx.globalAlpha = u % 100 === 0 ? .9 : .4;
+      const py = Math.round(Y(u)) + .5; ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (st.guides) {
+    ctx.strokeStyle = ctx.fillStyle = t('guide');
+    ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
+    for (const [name, v] of GUIDES) {
+      ctx.setLineDash(v === 0 ? [] : [5, 5]); ctx.lineWidth = v === 0 ? 1.5 : 1;
+      const py = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+      ctx.fillText(`${name}  ${v}`, 12, py - 6);
+    }
+    ctx.setLineDash([]); ctx.lineWidth = 1; ctx.globalAlpha = .75;
+    for (const v of [0, g.adv]) {
+      const px = Math.round(X(v)) + .5; ctx.beginPath(); ctx.moveTo(px, Y(M.asc + 60)); ctx.lineTo(px, Y(M.desc - 60)); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillText('0', X(0) + 5, Y(M.desc - 60) - 4);
+    ctx.fillText(`${g.adv}`, X(g.adv) + 5, Y(M.desc - 60) - 4);
+  }
+
+  if (st.trace) {
+    ctx.globalAlpha = .1; ctx.fillStyle = t('ink');
+    ctx.font = `${1000 * s}px Georgia, "Times New Roman", serif`;
+    ctx.fillText(st.sel, X(g.adv / 2) - ctx.measureText(st.sel).width / 2, Y(0));
+    ctx.globalAlpha = 1;
+  }
+
+  paintStrokes(ctx, g.strokes, x => X(x), Y, s, 1, t('ink'));
+}
+
+let cur = null, erasing = false, eraseUndoPending = false;
+function toFont(e) {
+  const r = board.getBoundingClientRect(), { s, ox, oy } = view;
+  const p = !st.pressure || e.pointerType === 'mouse' ? .5 : (e.pressure || .5);
+  return [Math.round((e.clientX - r.left - ox) / s), Math.round((oy - (e.clientY - r.top)) / s), +p.toFixed(2)];
+}
+function eraseAt(p) {
+  const g = glyphs[st.sel], r = Math.max(40, st.size * .6);
+  const keep = g.strokes.filter(s => !s.points.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < r));
+  if (keep.length === g.strokes.length) return;
+  if (eraseUndoPending) { pushUndo(); eraseUndoPending = false; }
+  g.strokes = keep; renderBoard();
+}
+board.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  board.setPointerCapture(e.pointerId);
+  $('#stPointer').textContent = e.pointerType === 'pen' ? 'Pressure: stylus' : e.pointerType === 'touch' ? 'Pressure: touch' : 'Pressure: mouse (constant)';
+  const p = toFont(e);
+  if (st.tool === 'brush') {
+    pushUndo(); cur = { size: st.size, points: [p] }; glyphs[st.sel].strokes.push(cur); renderBoard();
+  } else { erasing = true; eraseUndoPending = true; eraseAt(p); }
+});
+board.addEventListener('pointermove', e => {
+  const p = toFont(e);
+  $('#coords').textContent = `x ${p[0]}  y ${p[1]}`;
+  if (cur) {
+    const last = cur.points[cur.points.length - 1], k = 1 - st.smooth * .8;
+    const q = [Math.round(last[0] + (p[0] - last[0]) * k), Math.round(last[1] + (p[1] - last[1]) * k), p[2]];
+    if (Math.hypot(q[0] - last[0], q[1] - last[1]) >= 3) { cur.points.push(q); renderBoard(); }
+  } else if (erasing) eraseAt(p);
+});
+const endStroke = () => { if (cur || erasing) { cur = null; erasing = false; commit(); } };
+board.addEventListener('pointerup', endStroke);
+board.addEventListener('pointercancel', endStroke);
+board.addEventListener('pointerleave', () => { $('#coords').textContent = 'x —  y —'; });
+
+/* ---------- Undo ---------- */
+const undoStack = [], redoStack = [];
+function pushUndo() {
+  undoStack.push({ ch: st.sel, strokes: JSON.stringify(glyphs[st.sel].strokes) });
+  if (undoStack.length > 200) undoStack.shift();
+  redoStack.length = 0;
+}
+function swap(from, to, emptyMsg) {
+  const u = from.pop(); if (!u) return toast(emptyMsg);
+  to.push({ ch: u.ch, strokes: JSON.stringify(glyphs[u.ch].strokes) });
+  glyphs[u.ch].strokes = JSON.parse(u.strokes);
+  select(u.ch); commit();
+}
+const undo = () => swap(undoStack, redoStack, 'Nothing to undo');
+const redo = () => swap(redoStack, undoStack, 'Nothing to redo');
+
+/* ---------- Glyph grid ---------- */
+const tiles = () => [...document.querySelectorAll('.tile')];
+const tileFor = ch => tiles().find(t => t.dataset.ch === ch);
+function buildGrid() {
+  const grid = $('#glyphGrid'); grid.textContent = '';
+  for (const ch of CHARSET) {
+    if (st.filter !== 'all' && kind(ch) !== st.filter) continue;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tile'; b.dataset.ch = ch; b.setAttribute('aria-label', nameOf(ch));
+    const lab = document.createElement('span'); lab.textContent = ch;
+    b.append(document.createElement('canvas'), lab);
+    b.addEventListener('click', () => select(ch));
+    grid.append(b);
+  }
+  tiles().forEach(t => { t.setAttribute('aria-current', t.dataset.ch === st.sel); renderThumb(t.dataset.ch); });
+}
+function renderThumb(ch) {
+  const tile = tileFor(ch); if (!tile) return;
+  const { w, h, ctx } = fitCanvas(tile.querySelector('canvas')), g = glyphs[ch], t = tokens();
+  tile.classList.toggle('done', g.strokes.length > 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!g.strokes.length) {
+    ctx.globalAlpha = .28; ctx.fillStyle = t('graphite'); ctx.textAlign = 'center';
+    ctx.font = `500 ${h * .46}px "Hanken Grotesk", system-ui, sans-serif`;
+    ctx.fillText(ch, w / 2, h * .7); ctx.textAlign = 'start'; ctx.globalAlpha = 1;
+    return;
+  }
+  const s = Math.min(h / 1150, w / (g.adv + 200)), ox = (w - g.adv * s) / 2, oy = h / 2 + 300 * s;
+  paintStrokes(ctx, g.strokes, x => ox + x * s, y => oy - y * s, s, 1, t('ink'));
+}
+
+/* ---------- Selection, inspector, progress ---------- */
+function select(ch, scroll = true) {
+  st.sel = ch;
+  tiles().forEach(t => t.setAttribute('aria-current', t.dataset.ch === ch));
+  if (scroll) tileFor(ch)?.scrollIntoView({ block: 'nearest' });
+  renderBoard(); updateInspector();
+}
+function step(d) { const i = CHARSET.indexOf(st.sel); select(CHARSET[(i + d + CHARSET.length) % CHARSET.length]); }
+function updateInspector() {
+  const g = glyphs[st.sel], code = unicodeOf(st.sel);
+  $('#gChar').textContent = $('#badgeChar').textContent = st.sel;
+  $('#gCode').textContent = $('#badgeCode').textContent = code;
+  $('#gName').textContent = nameOf(st.sel);
+  $('#advInput').value = g.adv;
+  $('#strokeCount').textContent = g.strokes.length;
+  const xs = g.strokes.flatMap(s => s.points.map(p => p[0]));
+  $('#lsb').textContent = xs.length ? Math.round(Math.min(...xs)) : '—';
+  $('#rsb').textContent = xs.length ? Math.round(g.adv - Math.max(...xs)) : '—';
+  $('#navPos').textContent = `${CHARSET.indexOf(st.sel) + 1} / ${CHARSET.length}`;
+}
+const doneCount = () => CHARSET.filter(ch => glyphs[ch].strokes.length).length;
+function updateProgress() {
+  const n = doneCount();
+  $('#progressLabel').textContent = `${n} of ${CHARSET.length} drawn`;
+  $('#progressBar').style.width = `${n / CHARSET.length * 100}%`;
+}
+function commit() { save(); renderThumb(st.sel); updateInspector(); updateProgress(); renderPreview(); }
+
+/* ---------- Preview ---------- */
+const advOf = ch => /\s/.test(ch) ? 280 : (glyphs[ch]?.adv ?? 520);
+function layoutPreview(width) {
+  const s = st.psize / 1000, tr = st.tracking * s, pad = 20, lh = st.psize * 1.3, items = [];
+  let x = pad, line = 0;
+  for (const word of st.text.split(/(\s+)/)) {
+    if (!word) continue;
+    if (/^\s+$/.test(word)) { if (x > pad) x += 280 * s + tr; continue; }
+    const ww = [...word].reduce((a, ch) => a + advOf(ch) * s + tr, 0);
+    if (x + ww > width - pad && x > pad) { x = pad; line++; }
+    for (const ch of word) { items.push({ ch, x, line }); x += advOf(ch) * s + tr; }
+  }
+  return { items, lines: line + 1, s, lh, pad };
+}
+function renderPreview() {
+  const c = $('#previewCanvas'), out = $('#pvOut');
+  const L = layoutPreview(out.clientWidth);
+  c.style.height = Math.max(out.clientHeight, L.pad * 2 + L.lines * L.lh + 28) + 'px';
+  const { w, h, ctx } = fitCanvas(c), t = tokens(), tan = Math.tan(st.slant * PI / 180);
+  ctx.clearRect(0, 0, w, h);
+  for (const it of L.items) {
+    const g = glyphs[it.ch], base = L.pad + it.line * L.lh + M.asc * L.s;
+    const Y = y => base - y * L.s;
+    if (g && g.strokes.length) {
+      paintStrokes(ctx, g.strokes, (x, y) => it.x + (x + y * tan) * L.s, Y, L.s, st.weight, t('ink'));
+    } else {
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = t('graphite'); ctx.lineWidth = 1;
+      ctx.strokeRect(it.x + 60 * L.s, Y(M.cap), (advOf(it.ch) - 120) * L.s, M.cap * L.s); ctx.restore();
+    }
+  }
+  const missing = [...new Set([...st.text].filter(ch => !/\s/.test(ch) && !glyphs[ch]?.strokes.length))];
+  const box = $('#missing'); box.textContent = ''; box.hidden = !missing.length;
+  if (missing.length) {
+    box.append(`Not drawn yet (${missing.length}):`);
+    missing.slice(0, 10).forEach(ch => {
+      if (!glyphs[ch]) return;
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = ch;
+      b.title = `Draw ${nameOf(ch)}`; b.addEventListener('click', () => select(ch)); box.append(b);
+    });
+  }
+}
+const weightName = w => w < .75 ? 'Light 300' : w < 1.15 ? 'Regular 400' : w < 1.45 ? 'Semibold 600' : 'Bold 700';
+function bindRange(id, fn) { const el = $(id); el.addEventListener('input', () => { fn(+el.value); renderPreview(); }); }
+bindRange('#pvSize', v => { st.psize = v; $('#pvSizeVal').textContent = `${v} px`; });
+bindRange('#pvWeight', v => { st.weight = v / 100; $('#pvWeightVal').textContent = `${(v / 100).toFixed(2)}×`; $('#weightName').textContent = weightName(v / 100); });
+bindRange('#pvSlant', v => { st.slant = v; $('#pvSlantVal').textContent = `${v}°`; });
+bindRange('#pvTrack', v => { st.tracking = v; $('#pvTrackVal').textContent = `${v} u`; });
+$('#previewText').addEventListener('input', e => { st.text = e.target.value; renderPreview(); });
+document.querySelectorAll('[data-sample]').forEach(b => b.addEventListener('click', () => {
+  st.text = $('#previewText').value = b.dataset.sample; renderPreview();
+}));
+
+/* ---------- Tools & controls ---------- */
+function setTool(tool) {
+  st.tool = tool;
+  document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === tool));
+  board.classList.toggle('erase', tool === 'eraser');
+  updateStatus();
+}
+const updateStatus = () => { $('#stTool').textContent = `${st.tool === 'brush' ? 'Brush' : 'Eraser'} · ${st.size} u`; };
+document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+document.querySelectorAll('[data-soon]').forEach(b => b.addEventListener('click', () => toast(`${b.dataset.soon} is planned for phase 2.`)));
+function toggle(key) {
+  st[key] = !st[key];
+  document.querySelector(`[data-toggle="${key}"]`).setAttribute('aria-pressed', st[key]);
+  renderBoard();
+}
+document.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => toggle(b.dataset.toggle)));
+$('#undoBtn').addEventListener('click', undo);
+$('#redoBtn').addEventListener('click', redo);
+$('#clearBtn').addEventListener('click', () => {
+  if (!glyphs[st.sel].strokes.length) return toast('This glyph is already empty.');
+  pushUndo(); glyphs[st.sel].strokes = []; renderBoard(); commit();
+  toast(`Cleared “${st.sel}”. Press ⌘Z to bring it back.`);
+});
+$('#prevBtn').addEventListener('click', () => step(-1));
+$('#nextBtn').addEventListener('click', () => step(1));
+$('#advInput').addEventListener('change', e => {
+  glyphs[st.sel].adv = Math.min(1400, Math.max(100, Math.round(+e.target.value || 500)));
+  renderBoard(); commit();
+});
+function setSize(v) { st.size = Math.min(160, Math.max(20, v)); $('#brushSize').value = st.size; $('#brushSizeVal').textContent = `${st.size} u`; updateStatus(); }
+$('#brushSize').addEventListener('input', e => setSize(+e.target.value));
+$('#smooth').addEventListener('input', e => { st.smooth = e.target.value / 100; $('#smoothVal').textContent = `${e.target.value}%`; });
+$('#pressure').addEventListener('change', e => { st.pressure = e.target.checked; });
+$('#resetBtn').addEventListener('click', () => {
+  glyphs = sampleGlyphs(); undoStack.length = redoStack.length = 0;
+  save(); buildGrid(); select(st.sel); updateProgress(); renderPreview(); toast('Sample glyphs restored.');
+});
+document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+  st.filter = b.dataset.filter;
+  document.querySelectorAll('[data-filter]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  buildGrid();
+}));
+$('#familyName').value = st.family;
+$('#familyName').addEventListener('input', e => { st.family = e.target.value.trim() || 'Untitled'; save(); });
+$('#styleSel').addEventListener('change', e => { st.style = e.target.value; });
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea') || $('#exportDlg').open) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod) return;
+  const k = e.key.toLowerCase();
+  if (k === 'b') setTool('brush');
+  else if (k === 'e') setTool('eraser');
+  else if (k === 'g') toggle('grid');
+  else if (k === 't') toggle('trace');
+  else if (k === '[') setSize(st.size - 10);
+  else if (k === ']') setSize(st.size + 10);
+  else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+});
+
+/* ---------- Export dialog ---------- */
+const dlg = $('#exportDlg');
+const fileBase = () => `${st.family.replace(/[^A-Za-z0-9]/g, '') || 'Untitled'}-${st.style}`;
+const chosenFormats = () => [...document.querySelectorAll('#formats input:checked')].map(i => i.value);
+function updateExport() {
+  const empty = CHARSET.length - doneCount(), fmts = chosenFormats(), base = fileBase();
+  $('#exportTitle').textContent = `Export ${st.family}`;
+  document.querySelectorAll('.fam').forEach(el => { el.textContent = st.family; });
+  $('#emptyNotice').hidden = !empty;
+  $('#emptyText').textContent = `${empty} of ${CHARSET.length} glyphs are empty and will be left out of the font.`;
+  $('#fileList').textContent = fmts.map(f => `${base}.${f}`).join('  ') || 'Choose at least one format';
+  $('#doExport').textContent = fmts.length === 1 ? 'Export 1 file' : `Export ${fmts.length} files`;
+  $('#doExport').disabled = !fmts.length;
+  const web = ['woff2', 'woff', 'ttf'].filter(f => fmts.includes(f));
+  const fmtName = { woff2: 'woff2', woff: 'woff', ttf: 'truetype' };
+  $('#cssSnippet').textContent =
+`@font-face {
+  font-family: "${st.family}";
+  src: ${(web.length ? web : ['woff2']).map(f => `url("/fonts/${base}.${f}") format("${fmtName[f]}")`).join(',\n       ')};
+  font-weight: ${st.style === 'Bold' ? 700 : 400};
+  font-style: ${st.style === 'Italic' ? 'italic' : 'normal'};
+  font-display: swap;
+}
+
+h1 { font-family: "${st.family}", system-ui, sans-serif; }`;
+  const res = base.toLowerCase().replace(/-/g, '_');
+  $('#appSnippet').textContent =
+`<!-- Android: res/font/${res}.ttf -->
+<TextView android:fontFamily="@font/${res}" />
+
+// iOS (SwiftUI)
+Text("Hello").font(.custom("${st.family}", size: 32))`;
+}
+$('#exportBtn').addEventListener('click', () => { updateExport(); dlg.returnValue = ''; dlg.showModal(); });
+$('#formats').addEventListener('change', updateExport);
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== b.dataset.tab; });
+}));
+$('#gotoEmpty').addEventListener('click', () => {
+  const ch = CHARSET.find(c => !glyphs[c].strokes.length);
+  dlg.close(); if (ch) select(ch);
+});
+$('#copyCss').addEventListener('click', () => {
+  const text = $('#cssSnippet').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('CSS copied.'), () => {
+    const r = document.createRange(); r.selectNodeContents($('#cssSnippet'));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selected. Press ⌘C to copy.');
+  });
+});
+dlg.addEventListener('close', () => {
+  if (dlg.returnValue === 'export') toast(`Mockup only. The app builds ${chosenFormats().map(f => '.' + f).join(', ')} with opentype.js.`);
+});
+
+/* ---------- Toast, theme, boot ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2800);
+}
+function renderAll() { renderBoard(); CHARSET.forEach(renderThumb); renderPreview(); }
+$('#themeBtn').addEventListener('click', () => {
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  renderAll();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+
+new ResizeObserver(() => { B = fitCanvas(board); renderBoard(); }).observe(board);
+new ResizeObserver(() => renderPreview()).observe($('#pvOut'));
+
+buildGrid(); select('a', false); updateProgress(); renderPreview(); updateStatus();
+document.fonts?.ready.then(renderAll);
+</script>
+</body>
+</html>

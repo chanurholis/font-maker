@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
+/* Drafting table for type: cool paper, ink strokes, one proof-magenta accent. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #edf0f3;
+  --sheet: #ffffff;
+  --box: #f5f8fb;
+  --ink: #141821;
+  --graphite: #5e6878;
+  --rule: #d5dbe3;
+  --hover: #e4e9ef;
+  --proof: #d12a6b;
+  --proof-soft: rgba(209, 42, 107, 0.11);
+  --on-proof: #ffffff;
+  --guide: #2f7fa8;
+  --warn: #9a5b08;
+  --warn-soft: rgba(196, 124, 20, 0.12);
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #101318;
+    --sheet: #181c23;
+    --box: #1c212a;
+    --ink: #e8ecf2;
+    --graphite: #8d97a8;
+    --rule: #2a303b;
+    --hover: #222833;
+    --proof: #ff5c98;
+    --proof-soft: rgba(255, 92, 152, 0.14);
+    --on-proof: #1a0710;
+    --guide: #5db4de;
+    --warn: #e3a34a;
+    --warn-soft: rgba(227, 163, 74, 0.12);
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-box: var(--box);
+  --color-ink: var(--ink);
+  --color-graphite: var(--graphite);
+  --color-rule: var(--rule);
+  --color-hover: var(--hover);
+  --color-proof: var(--proof);
+  --color-proof-soft: var(--proof-soft);
+  --color-on-proof: var(--on-proof);
+  --color-guide: var(--guide);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-display: var(--font-bricolage), system-ui, sans-serif;
+  --font-sans: var(--font-hanken), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--proof);
+  outline-offset: 2px;
+}
+
+input[type="range"],
+input[type="checkbox"] {
+  accent-color: var(--proof);
+}
+
+dialog::backdrop {
+  background: rgba(10, 12, 16, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* Shared control styles used across the editor */
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.125rem;
+  padding-inline: 0.875rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--sheet);
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  &:hover { background: var(--hover); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+@utility btn-primary {
+  background: var(--proof);
+  border-color: var(--proof);
+  color: var(--on-proof);
+  &:hover { background: var(--proof); filter: brightness(1.06); }
+}
+@utility chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  color: var(--graphite);
+  cursor: pointer;
+  &:hover { color: var(--ink); }
+  &[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+}
+@utility label-caps {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--graphite);
 }
